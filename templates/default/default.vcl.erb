@@ -9,50 +9,72 @@ include "/etc/varnish/geoip.vcl";
 # server.
 # 
 backend default {
-  .host = "<%= @params[:VARNISH_BACKEND_ADDRESS] %>";
-  .port = "<%= @params[:VARNISH_BACKEND_PORT] %>";
+  .host = "<%= @params[:VARNISH_DEFAULT_BACKEND_ADDRESS] %>";
+  .port = "<%= @params[:VARNISH_DEFAULT_BACKEND_PORT] %>";
 }
+
+<% if node['varnish'].has_key?("named_backends") %>
+<% node['varnish']["named_backends"].each do | name, desc | %>
+backend <%= name %> {
+  .host = "<%= node['varnish']['named_backends'][name]["host"] %>";
+  .port = "<%= node['varnish']['named_backends'][name]["port"] %>";
+}
+<% end %>
+<% end %>
 
 # Below is a commented-out copy of the default VCL logic.  If you
 # redefine any of these subroutines, the built-in logic will be
 # appended to your code.
-# sub vcl_recv {
-#     if (req.restarts == 0) {
-#         if (req.http.x-forwarded-for) {
-#             set req.http.X-Forwarded-For =
-#             req.http.X-Forwarded-For + ", " + client.ip;
-#         } else {
-#             set req.http.X-Forwarded-For = client.ip;
-#         }
-#         <% if node['varnish']['GeoIP_enabled'] %>
-#         if (req.url !~ "\.(jpeg|jpg|png|gif|ico|swf|js|css|gz|rar|txt|bzip|pdf)(\?.*|)$") {
-#             C{
-#                 vcl_geoip_country_set_header(sp);
-#             }C
-#         }
-#         <% end %>
-#     }
-#     if (req.request != "GET" &&
-#       req.request != "HEAD" &&
-#       req.request != "PUT" &&
-#       req.request != "POST" &&
-#       req.request != "TRACE" &&
-#       req.request != "OPTIONS" &&
-#       req.request != "DELETE") {
-#         /* Non-RFC2616 or CONNECT which is weird. */
-#         return (pipe);
-#     }
-#     if (req.request != "GET" && req.request != "HEAD") {
-#         /* We only deal with GET and HEAD by default */
-#         return (pass);
-#     }
-#     if (req.http.Authorization || req.http.Cookie) {
-#         /* Not cacheable by default */
-#         return (pass);
-#     }
-#     return (lookup);
-# }
-# 
+sub vcl_recv {
+    <% if node['varnish'].has_key?("named_backends") %>
+    <% node['varnish']["named_backends"].each do | name, desc | %>
+    if (req.http.host ~ "<%= node['varnish']['named_backends'][name]["domain"] %>") {
+        set req.backend = <%= name %>;
+    } else {
+    <% end %>
+        set req.backend = default;
+    }
+    <% end %>
+    if (req.restarts == 0) {
+        if (req.http.x-forwarded-for) {
+            set req.http.X-Forwarded-For =
+            req.http.X-Forwarded-For + ", " + client.ip;
+        } else {
+            set req.http.X-Forwarded-For = client.ip;
+        }
+        <% if node['varnish']['GeoIP_enabled'] %>
+        if (req.url !~ "\.(jpeg|jpg|png|gif|ico|swf|js|css|gz|rar|txt|bzip|pdf)(\?.*|)$") {
+            C{
+                vcl_geoip_country_set_header(sp);
+            }C
+        }
+        <% end %>
+    }
+    if (req.request != "GET" &&
+      req.request != "HEAD" &&
+      req.request != "PUT" &&
+      req.request != "POST" &&
+      req.request != "TRACE" &&
+      req.request != "OPTIONS" &&
+      req.request != "DELETE") {
+        /* Non-RFC2616 or CONNECT which is weird. */
+        return (pipe);
+    }
+    if (req.request != "GET" && req.request != "HEAD") {
+        /* We only deal with GET and HEAD by default */
+        return (pass);
+    }
+    if (req.http.Authorization || req.http.Cookie) {
+        /* Not cacheable by default */
+        return (pass);
+    }
+    <% if node['varnish']['dont_cache_anything'] %>
+    return (pass);
+    <% else %>
+    return (lookup);
+    <% end %>
+}
+ 
 # sub vcl_pipe {
 #     # Note that only the first request to the backend will have
 #     # X-Forwarded-For set.  If you use X-Forwarded-For and want to

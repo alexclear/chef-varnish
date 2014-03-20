@@ -8,8 +8,8 @@ end
 default['varnish']['config_dir'] = "/etc/varnish"
 default['varnish']['VARNISH_VCL_CONF'] = "/etc/varnish/default.vcl"
 default['varnish']['VARNISH_LISTEN_PORT'] = 6081
-default['varnish']['VARNISH_BACKEND_PORT'] = 80
-default['varnish']['VARNISH_BACKEND_ADDRESS'] = "127.0.0.1"
+default['varnish']['VARNISH_DEFAULT_BACKEND_PORT'] = 80
+default['varnish']['VARNISH_DEFAULT_BACKEND_ADDRESS'] = "127.0.0.1"
 default['varnish']['VARNISH_ADMIN_LISTEN_ADDRESS'] = "127.0.0.1"
 default['varnish']['VARNISH_ADMIN_LISTEN_PORT'] = 6082
 default['varnish']['VARNISH_SECRET_FILE'] = "/etc/varnish/secret"
